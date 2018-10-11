@@ -1,6 +1,23 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
+[SimConfig]
+Sim_filename='Exp_01'
+Sim_variables={'condition':[1,2],'pathology':[1,3]}
+Sim_realizations={'Exp01':2}
+Sim_name='E01'
+Sim_path='./'
+Sim_hostname='neptuno'
+Sim_out_filename='out'
+Sim_eout_filename='err'
+
+Slurm_ntasks = 1
+Slurm_tasks_per_node = 0
+Slurm_cpus_per_task = 0
+Slurm_nodes = 0
+Slurm_email= 'jrestrepo@bioingenieria.edu.ar'
+[end]
+
 Created on Mon Jun 18 14:12:22 2018
 
 @author: rcasal
@@ -29,6 +46,7 @@ from global_parameters import device, dtype_target, dtype_data
 # main
 # ----
 #
+
 
 # D_in is input dimension, H is hidden dimension; D_out is output dimension.
 D_in, H, num_layers, batch_size, D_out = 2, 160, 2, 2,  2
