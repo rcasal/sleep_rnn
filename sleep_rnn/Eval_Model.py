@@ -13,8 +13,7 @@
 import torch
 import time
 import copy
-from global_parameters import cuda, dtype_target, dtype_data
-from model import ce_loss, statistics
+from Model import ce_loss, statistics
 
 def eval_model(model, dataloaders):
 

@@ -45,8 +45,8 @@ from global_parameters import cuda, dtype_target, dtype_data
 #
 
 
-# D_in is input dimension, H is hidden dimension; D_out is output dimension.
-D_in, H, num_layers, batch_size, D_out = 1, 128, 2, 2,  2
+# d_in is input dimension, H is hidden dimension; d_out is output dimension.
+d_in, H, num_layers, batch_size, d_out = 1, 128, 2, 2,  2
 GRU = True
 
 
@@ -65,17 +65,17 @@ dataloaders = {x: DataLoader(datasets[x], **params)
 
 # Load model and set criterion
 if GRU:
-    model_ft = model_gru(D_in, H, num_layers, batch_size, D_out).to(device=cuda)
+    model_ft = model_gru(d_in, H, num_layers, batch_size, d_out).to(device=cuda)
 else:
-    model_ft = model_lstm(D_in, H, num_layers, batch_size, D_out).to(device=cuda)
+    model_ft = model_lstm(d_in, H, num_layers, batch_size, d_out).to(device=cuda)
 
 model_ft.load_state_dict(torch.load('../sleep_rnn/models/model_ft.pth'))
 
 # Prints
 print('Parameters:')
 print('\tGRU: {}'.format(GRU))
-print('\tD_in: {} \n\tH: {} \n\tnum_layers: {} \n\tbatch_size_ {} \n\tD_out: {}'.format(
-        D_in, H, num_layers, batch_size, D_out))
+print('\td_in: {} \n\tH: {} \n\tnum_layers: {} \n\tbatch_size_ {} \n\td_out: {}'.format(
+        d_in, H, num_layers, batch_size, d_out))
 print('\n')
 
 ######################################################################

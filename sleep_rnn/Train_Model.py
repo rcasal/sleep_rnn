@@ -13,32 +13,47 @@
 import torch
 import time
 import copy
+import os
 from sleep_rnn.Model import ce_loss, statistics
 
-def train_model(model, optimizer, dataloaders, scheduler, num_epochs=25, cuda=None, dtype_data=None, dtype_target=None):
+
+def train_model(model, optimizer, dataloaders, scheduler=None, num_epochs=25, cuda=None, dtype_data=None,
+                dtype_target=None, path_bkp=None, checkpoint=None):
 
     # init
 
-    if cuda == None:
+    if cuda is None:
         cuda = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    if dtype_data == None:
+    if dtype_data is None:
         dtype_data = torch.float32
 
-    if dtype_target == None:
+    if dtype_target is None:
         dtype_target = torch.int64
 
     since = time.time()
 
     best_model_wts = copy.deepcopy(model.state_dict())
     best_acc = 0.0
+    epoch_run = 0
+
+    # Checkpoint
+    if checkpoint is True:
+        cp = torch.load(os.path.join(path_bkp, 'bkp_model_ft.pth'))
+        epoch_run = cp['epoch']
+        model.load_state_dict(cp['model_state_dict'])
+        best_model_wts = cp['best_model_wts']
+        optimizer.load_state_dict(cp['optimizer_state_dict'])
+        best_acc = cp['best_acc']
+        print('Resuming script in epoch {}. Best acc = {:4f}'.format(epoch_run, best_acc))
 
     print('-' * 118)
     print('|{:^12}|{:^12}|{:^12}|{:^12}|{:^12}|{:^12}|{:^12}|{:^12}|{:^12}|'.format(
         'Epoch', 'Phase', 'mini_batch', 'loss', 'acc', 'se', 'sp', 'pre', 'npv'))
     print('-' * 118)
 
-    for epoch in range(num_epochs):
+    for epoch in range(num_epochs-epoch_run):
+
         print('-' * 118)
 
         since_epoch = time.time()
@@ -48,7 +63,9 @@ def train_model(model, optimizer, dataloaders, scheduler, num_epochs=25, cuda=No
 
         for phase in ['train', 'val']:
             if phase == 'train':
-                # scheduler.step()
+                if scheduler is not None:
+                    scheduler.step()
+
                 model.train()  # Set model to training mode
             else:
                 model.eval()   # Set model to evaluate mode
@@ -84,7 +101,7 @@ def train_model(model, optimizer, dataloaders, scheduler, num_epochs=25, cuda=No
                     # Compute and print loss.
                     loss = ce_loss(outputs, sample['target'])
                     batch_acc, batch_se, batch_sp, batch_pre, batch_npv = statistics(outputs, sample['target'],
-                                                                                      sample['lengths'])
+                                                                                     sample['lengths'])
 
                     # del sample
                     lb = sample['feat'].size(0)
@@ -108,15 +125,14 @@ def train_model(model, optimizer, dataloaders, scheduler, num_epochs=25, cuda=No
                 # print('Batch complete in {:.2f}s'.format((time.time()-since_batch)))
 
                 # prints
-                if ( (i_batch + 1) % 250 == 0 and i_batch != 0 and phase == 'train'):
+                if (i_batch + 1) % 250 == 0 and i_batch != 0 and phase == 'train':
                     cte_batch = (i_batch + 1)*lb
                     print('|{:^12}|{:^12}|{:^12}|{:^12.4f}|{:^12.4f}|{:^12.4f}|{:^12.4f}|{:^12.4f}|{:^12.4f}|'.format(
-                        epoch, phase, i_batch, running_loss/cte_batch, running_acc/cte_batch, running_se/cte_batch,
-                        running_sp/cte_batch, running_pre/cte_batch, running_npv/cte_batch))
-
+                        epoch + epoch_run, phase, i_batch, running_loss/cte_batch, running_acc/cte_batch,
+                        running_se/cte_batch, running_sp/cte_batch, running_pre/cte_batch, running_npv/cte_batch))
 
             cte_epoch = (i_batch + 1) * lb
-            epoch_loss = running_loss / cte_epoch                   # Recordar lo del drop_last
+            epoch_loss = running_loss / cte_epoch                   # Remember drop_last
             epoch_acc = running_acc / cte_epoch
             epoch_se = running_se / cte_epoch
             epoch_sp = running_sp / cte_epoch
@@ -125,7 +141,7 @@ def train_model(model, optimizer, dataloaders, scheduler, num_epochs=25, cuda=No
 
             print('-' * 118)
             print('|{:^12}|{:^12}|{:^12}|{:^12.4f}|{:^12.4f}|{:^12.4f}|{:^12.4f}|{:^12.4f}|{:^12.4f}|'.format(
-                epoch, phase, i_batch, epoch_loss, epoch_acc, epoch_se, epoch_sp, epoch_pre, epoch_npv))
+                epoch + epoch_run, phase, i_batch, epoch_loss, epoch_acc, epoch_se, epoch_sp, epoch_pre, epoch_npv))
 
             if phase == 'val':
                 time_elapsed_epoch = time.time()-since_epoch
@@ -137,15 +153,15 @@ def train_model(model, optimizer, dataloaders, scheduler, num_epochs=25, cuda=No
                 best_acc = epoch_acc
                 best_model_wts = copy.deepcopy(model.state_dict())
 
-
-            # Save chekcpoint
+        # Save checkpoint
+        if path_bkp is not None:
             torch.save({
-                'epoch': epoch,
+                'epoch': epoch + epoch_run + 1,
                 'model_state_dict': model.state_dict(),
-
-            })
-
-
+                'optimizer_state_dict': optimizer.state_dict(),
+                'best_model_wts': best_model_wts,
+                'best_acc': best_acc
+            }, os.path.join(path_bkp, 'bkp_model_ft.pth'))
 
     time_elapsed = time.time() - since
     print('Training complete in {:.0f}m {:.0f}s'.format(
@@ -155,4 +171,3 @@ def train_model(model, optimizer, dataloaders, scheduler, num_epochs=25, cuda=No
     # load best model weights
     model.load_state_dict(best_model_wts)
     return model
-

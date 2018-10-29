@@ -12,21 +12,17 @@ from scipy.io import loadmat
 import os
 
 
-
-
-class SHHS_Dataset(Dataset):
-    """SHHS dataset"""
+class ShhsDataset(Dataset):
 
     def __init__(self, dbpath, transform=None, loadSaO2=True):
         self.dbpath = dbpath
         self.listdir = os.listdir(self.dbpath)
         self.listdir.sort()
         self.listdir = self.listdir[1:]         # Discard sample 1: sequenceLengths.mat
-        self.transform=transform
-        self.loadSaO2= loadSaO2
+        self.transform = transform
+        self.loadSaO2 = loadSaO2
         self.lengths = loadmat(os.path.join(self.dbpath, 'sequenceLengths.mat'))
         self.lengths = self.lengths['sequenceLengths'].squeeze()
-
 
     def __len__(self):
         return len(self.listdir)
@@ -37,7 +33,6 @@ class SHHS_Dataset(Dataset):
             feats = np.concatenate((subj['HR'].reshape(-1, 1), subj['SaO2'].reshape(-1, 1)), axis=1)
         else:
             feats = subj['HR'].reshape(-1, 1)
-
 
         target = subj['target2'].flatten()
 
@@ -50,10 +45,10 @@ class SHHS_Dataset(Dataset):
 
 
 class ToTensor(object):
-    """Convert ndarrays in sample to Tensors."""
+    # Convert arrays in sample to Tensors
 
     def __call__(self, sample):
-        "Casteo en el formato que pide LossFunction y demás"
+        # Cast in format to LossFunction'
         sample['feat'] = torch.from_numpy(sample['feat'])
         sample['target'] = torch.from_numpy(sample['target'])
 
@@ -71,7 +66,7 @@ def sequence_len(sample):
     return len(sample['target'])
 
 
-def collate_fn_RC(batch):
+def collate_fn_rc(batch):
     """Creates mini-batch tensors from the list of samples
 
     We should build custom collate_fn rather than using default collate_fn,
@@ -106,7 +101,7 @@ def collate_fn_RC(batch):
         padded_target[i, 0:lengths[i]] = target[:lengths[i]]
 
     # ToTensor!
-    padded_feats=torch.from_numpy(padded_feats)
-    padded_target=torch.from_numpy(padded_target)
+    padded_feats = torch.from_numpy(padded_feats)
+    padded_target = torch.from_numpy(padded_target)
 
     return {'feat': padded_feats, 'target': padded_target, 'lengths': lengths}

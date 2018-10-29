@@ -9,30 +9,28 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-class model_lstm(nn.Module):
-    def __init__(self, D_in, hidden_size, num_layers, batch_size, D_out):
+class ModelLstm(nn.Module):
+    def __init__(self, d_in, hidden_size, num_layers, batch_size, d_out):
 
-        super(model_lstm, self).__init__()
+        super(ModelLstm, self).__init__()
 
-        self.D_in = D_in
+        self.d_in = d_in
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.batch_size = batch_size
 
-        self.D_out = D_out
+        self.d_out = d_out
 
+        self.lstm = torch.nn.LSTM(input_size=self.d_in,
+                                  hidden_size=self.hidden_size,
+                                  num_layers=self.num_layers,
+                                  bidirectional=True,
+                                  batch_first=True)
 
-        self.lstm = torch.nn.LSTM(input_size=self.D_in,
-                                 hidden_size=self.hidden_size,
-                                 num_layers=self.num_layers,
-                                 bidirectional=True,
-                                 batch_first=True)
-        #self.lstm = nn.DataParallel(self.lstm, device_ids=[0, 1])
-        #torch.nn.init.xavier_normal_(self.lstm.all_weights)
+        # self.lstm = nn.DataParallel(self.lstm, device_ids=[0, 1])
+        # torch.nn.init.xavier_normal_(self.lstm.all_weights)
 
-
-
-        self.linear = torch.nn.Linear(hidden_size*2, D_out)#.type(dst_type=self.dtype_data) # 2 for bidirection
+        self.linear = torch.nn.Linear(hidden_size*2, d_out)  # .type(dst_type=self.dtype_data) # 2 for bidirection
 
     def init_hidden(self):
         """ the weights are of the form (num_layers, batch_size, nb_lstm_units)
@@ -48,7 +46,6 @@ class model_lstm(nn.Module):
 
         return h0.zero_(), c0.zero_()
 
-
     def forward(self, x, x_lengths):
         """ reset the LSTM hidden state. Must be done before you run a new patient. Otherwise the LSTM will treat
         # a new batch as a continuation of a sequence """
@@ -58,10 +55,10 @@ class model_lstm(nn.Module):
         batch_size, seq_len, _ = x.size()
 
         # 1. Run through RNN
-        # Dim transformation: (batch_size, seq_len, D_in) -> (batch_size, seq_len, hidden_size)
+        # Dim transformation: (batch_size, seq_len, d_in) -> (batch_size, seq_len, hidden_size)
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the LSTM
-        x = nn.utils.rnn.pack_padded_sequence (x, x_lengths, batch_first=True)
+        x = nn.utils.rnn.pack_padded_sequence(x, x_lengths, batch_first=True)
 
         # now run through LSTM
         x, self.hidden = self.lstm(x, self.hidden)
@@ -73,58 +70,54 @@ class model_lstm(nn.Module):
         # Dim transformation: (batch_size, seq_len, hidden_size) -> (batch_size * seq_len, hidden_size)
 
         # this one is a bit tricky as well. First we need to reshape the data so it goes into the linear layer
-        x = x.contiguous()                  # This doesn't affect the tensor at all, just make sure that it is stored in a contiguous chunk of memory.
+        # This doesn't affect the tensor at all, just make sure that it is stored in a contiguous chunk of memory.
+        x = x.contiguous()
         x = x.view(-1, x.shape[2])
 
         # run through actual linear layer
         x = F.relu(self.linear(x))
 
-
         # 3. Create softmax activations bc we're doing classification
-        # Dim transformation: (batch_size * seq_len, hidden_size) -> (batch_size, seq_len, D_out)
+        # Dim transformation: (batch_size * seq_len, hidden_size) -> (batch_size, seq_len, d_out)
         x = F.log_softmax(x, dim=1)
 
-        # I like to reshape for mental sanity so we're back to (batch_size, seq_len, D_out)
-        x = x.view(batch_size, seq_len, self.D_out)
+        # I like to reshape for mental sanity so we're back to (batch_size, seq_len, d_out)
+        x = x.view(batch_size, seq_len, self.d_out)
 
-        y_hat = x #.type(dtype=dtype_target)
+        y_hat = x  # .type(dtype=dtype_target)
         return y_hat
 
 
+class ModelGru(nn.Module):
+    def __init__(self, d_in, hidden_size, num_layers, batch_size, d_out):
 
-class model_gru(nn.Module):
-    def __init__(self, D_in, hidden_size, num_layers, batch_size, D_out):
+        super(ModelGru, self).__init__()
 
-        super(model_gru, self).__init__()
-
-        self.D_in = D_in
+        self.d_in = d_in
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.batch_size = batch_size
 
-        self.D_out = D_out
-
-
+        self.d_out = d_out
 
         # Initialize GRU; the input_size and hidden_size params are both set to 'hidden_size'
         #   because our input size is a word embedding with number of features == hidden_size
-        self.gru = nn.GRU(input_size=self.D_in,
-                                  hidden_size=self.hidden_size,
-                                  num_layers=self.num_layers,
-                                  bidirectional=True,
-                                  batch_first=True)
+        self.gru = nn.GRU(input_size=self.d_in,
+                          hidden_size=self.hidden_size,
+                          num_layers=self.num_layers,
+                          bidirectional=True,
+                          batch_first=True)
 
-
-        self.linear = torch.nn.Linear(hidden_size*2, D_out) #.type(dst_type=self.dtype_data) # 2 for bidirection
+        self.linear = torch.nn.Linear(hidden_size*2, d_out)  # .type(dst_type=self.dtype_data) # 2 for bidirection
 
     def init_hidden(self):
         """ the weights are of the form (num_layers, batch_size, nb_gru_units)
         Set initial hidden and cell states
         ¿INICIO CON ZEROS O CON RANDN? VI LOS DOS CASOS."""
-        h0 = torch.autograd.Variable(next(self.parameters()).data.new(self.num_layers*2, self.batch_size,  self.hidden_size), requires_grad=False)
+        h0 = torch.autograd.Variable(next(self.parameters()).data.new(
+            self.num_layers*2, self.batch_size, self.hidden_size), requires_grad=False)
 
         return h0.zero_()
-
 
     def forward(self, x, x_lengths):
         """ reset the GRU hidden state. Must be done before you run a new patient. Otherwise the GRU will treat
@@ -135,10 +128,10 @@ class model_gru(nn.Module):
         batch_size, seq_len, _ = x.size()
 
         # 1. Run through RNN
-        # Dim transformation: (batch_size, seq_len, D_in) -> (batch_size, seq_len, hidden_size)
+        # Dim transformation: (batch_size, seq_len, d_in) -> (batch_size, seq_len, hidden_size)
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the GRU
-        x = nn.utils.rnn.pack_padded_sequence (x, x_lengths, batch_first=True)
+        x = nn.utils.rnn.pack_padded_sequence(x, x_lengths, batch_first=True)
 
         # now run through GRU
         x, self.hidden = self.gru(x, self.hidden)
@@ -150,25 +143,21 @@ class model_gru(nn.Module):
         # Dim transformation: (batch_size, seq_len, hidden_size) -> (batch_size * seq_len, hidden_size)
 
         # this one is a bit tricky as well. First we need to reshape the data so it goes into the linear layer
-        x = x.contiguous()                  # This doesn't affect the tensor at all, just make sure that it is stored in a contiguous chunk of memory.
+        x = x.contiguous()
         x = x.view(-1, x.shape[2])
 
         # run through actual linear layer
         x = F.relu(self.linear(x))
 
-
         # 3. Create softmax activations bc we're doing classification
-        # Dim transformation: (batch_size * seq_len, hidden_size) -> (batch_size, seq_len, D_out)
+        # Dim transformation: (batch_size * seq_len, hidden_size) -> (batch_size, seq_len, d_out)
         x = F.log_softmax(x, dim=1)
 
-        # I like to reshape for mental sanity so we're back to (batch_size, seq_len, D_out)
-        x = x.view(batch_size, seq_len, self.D_out)
+        # I like to reshape for mental sanity so we're back to (batch_size, seq_len, d_out)
+        x = x.view(batch_size, seq_len, self.d_out)
 
-        y_hat = x #.type(dtype=dtype_target)
+        y_hat = x  # .type(dtype=dtype_target)
         return y_hat
-
-
-
 
 
 def ce_loss(y_hat, y):
@@ -178,15 +167,15 @@ def ce_loss(y_hat, y):
     and calculate the loss on that. """
 
     # flatten all the labels
-    y= y.view(-1)
+    y = y.view(-1)
 
-    _, _, D_out = y_hat.shape
+    _, _, d_out = y_hat.shape
     # flatten all predictions
-    y_hat = y_hat.view(-1, D_out)
+    y_hat = y_hat.view(-1, d_out)
 
     # create a mask by filtering out all tokens that ARE NOT the padding token
     tag_pad_token = -1
-    mask = (y > tag_pad_token).float()#.type(dtype=dtype_target)
+    mask = (y > tag_pad_token).float()  # .type(dtype=dtype_target)
 
     # count how many tokens we have
     nb_tokens = int(torch.sum(mask).item())
@@ -214,9 +203,9 @@ def statistics(y_hat, y, y_lengths):
     precision = 0.0
     npv = 0.0
     for i in range(y.size()[0]):
-        #accuracy1 += torch.sum(preds[i, 0:y_lengths[i]] == y.data[i, 0:y_lengths[i]]).float() / y_lengths[i]
+        # accuracy1 += torch.sum(preds[i, 0:y_lengths[i]] == y.data[i, 0:y_lengths[i]]).float() / y_lengths[i]
 
-        #confusion matrix: 1 and 1 (TP); 1 and 0 (FP); 0 and 0 (TN); 0 and 1 (FN)
+        # confusion matrix: 1 and 1 (TP); 1 and 0 (FP); 0 and 0 (TN); 0 and 1 (FN)
         aux = preds[i, 0:y_lengths[i]].float() / y.data[i, 0:y_lengths[i]].float()
 
         # Element-wise division of the 2 tensors returns a new tensor which holds a
@@ -237,12 +226,14 @@ def statistics(y_hat, y, y_lengths):
         precision += tp / (tp + fp)
         npv += tn / (tn + fn)
 
+        del tp, fp, tn, fn, aux
+
     accuracy = accuracy / len(y_lengths)
     sensibility = sensibility / len(y_lengths)
     specificity = specificity / len(y_lengths)
     precision = precision / len(y_lengths)
     npv = npv / len(y_lengths)
 
-    del tp, fp, tn, fn, aux, y_hat, y, y_lengths
+    del y_hat, y, y_lengths
 
     return accuracy, sensibility, specificity, precision, npv
