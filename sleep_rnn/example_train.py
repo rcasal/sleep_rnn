@@ -53,7 +53,7 @@ print('Exp is running in {} No.{}'.format(
 # main
 # ----
 #
-gru = 0
+gru = 1
 h = 1
 Exp01 = 1
 
@@ -69,7 +69,7 @@ D_in, H, num_layers, batch_size, D_out = 1, h, 2, 2,  2
 
 
 # Database
-datasets = {x: SHHS_Dataset(dbpath=os.path.abspath(os.path.join('../db/All_shhsCell_SN/patient/', x)),
+datasets = {x: SHHS_Dataset(dbpath=os.path.abspath(os.path.join('../../db/All_shhsCell_SN/patient/', x)),
                                  transform=T.Compose([ToTensor()]), loadSaO2=False)
            for x in ['train', 'val']}
 
