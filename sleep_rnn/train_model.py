@@ -13,7 +13,7 @@
 import torch
 import time
 import copy
-from model import ce_loss, statistics
+from .model import ce_loss, statistics
 
 def train_model(model, optimizer, dataloaders, scheduler, num_epochs=25, cuda=None, dtype_data=None, dtype_target=None):
 
