@@ -17,12 +17,13 @@ import os
 class SHHS_Dataset(Dataset):
     """SHHS dataset"""
 
-    def __init__(self, dbpath, transform=None):
+    def __init__(self, dbpath, transform=None, loadSaO2=True):
         self.dbpath = dbpath
         self.listdir = os.listdir(self.dbpath)
         self.listdir.sort()
         self.listdir = self.listdir[1:]         # Discard sample 1: sequenceLengths.mat
         self.transform=transform
+        self.loadSaO2= loadSaO2
         self.lengths = loadmat(os.path.join(self.dbpath, 'sequenceLengths.mat'))
         self.lengths = self.lengths['sequenceLengths'].squeeze()
 
@@ -32,7 +33,12 @@ class SHHS_Dataset(Dataset):
 
     def __getitem__(self, idx):
         subj = loadmat(os.path.join(self.dbpath, self.listdir[idx]))
-        feats = np.concatenate((subj['HR'].reshape(-1, 1), subj['SaO2'].reshape(-1, 1)), axis=1)
+        if self.loadSaO2:
+            feats = np.concatenate((subj['HR'].reshape(-1, 1), subj['SaO2'].reshape(-1, 1)), axis=1)
+        else:
+            feats = subj['HR'].reshape(-1, 1)
+
+
         target = subj['target2'].flatten()
 
         sample = {'feat': feats, 'target': target}

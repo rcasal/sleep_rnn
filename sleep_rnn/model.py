@@ -7,7 +7,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from global_parameters import device, dtype_target, dtype_data
 
 
 class model_lstm(nn.Module):
@@ -22,6 +21,7 @@ class model_lstm(nn.Module):
 
         self.D_out = D_out
 
+
         self.lstm = torch.nn.LSTM(input_size=self.D_in,
                                  hidden_size=self.hidden_size,
                                  num_layers=self.num_layers,
@@ -32,19 +32,21 @@ class model_lstm(nn.Module):
 
 
 
-        self.linear = torch.nn.Linear(hidden_size*2, D_out).type(dst_type=dtype_data) # 2 for bidirection
+        self.linear = torch.nn.Linear(hidden_size*2, D_out)#.type(dst_type=self.dtype_data) # 2 for bidirection
 
     def init_hidden(self):
         """ the weights are of the form (num_layers, batch_size, nb_lstm_units)
         Set initial hidden and cell states
         ¿INICIO CON ZEROS O CON RANDN? VI LOS DOS CASOS."""
-        h0 = torch.zeros(self.num_layers*2, self.batch_size, self.hidden_size) # 2 for bidirection
-        c0 = torch.zeros(self.num_layers*2, self.batch_size, self.hidden_size)
 
-        h0 = torch.autograd.Variable(h0.type(dtype=dtype_data), requires_grad=True).to(device)
-        c0 = torch.autograd.Variable(c0.type(dtype=dtype_data), requires_grad=True).to(device)
+        h0 = torch.autograd.Variable(
+            next(self.parameters()).data.new(self.num_layers * 2, self.batch_size, self.hidden_size),
+            requires_grad=False)
+        c0 = torch.autograd.Variable(
+            next(self.parameters()).data.new(self.num_layers * 2, self.batch_size, self.hidden_size),
+            requires_grad=False)
 
-        return (h0, c0)
+        return h0.zero_(), c0.zero_()
 
 
     def forward(self, x, x_lengths):
@@ -102,6 +104,8 @@ class model_gru(nn.Module):
 
         self.D_out = D_out
 
+
+
         # Initialize GRU; the input_size and hidden_size params are both set to 'hidden_size'
         #   because our input size is a word embedding with number of features == hidden_size
         self.gru = nn.GRU(input_size=self.D_in,
@@ -111,16 +115,15 @@ class model_gru(nn.Module):
                                   batch_first=True)
 
 
-        self.linear = torch.nn.Linear(hidden_size*2, D_out).type(dst_type=dtype_data) # 2 for bidirection
+        self.linear = torch.nn.Linear(hidden_size*2, D_out) #.type(dst_type=self.dtype_data) # 2 for bidirection
 
     def init_hidden(self):
         """ the weights are of the form (num_layers, batch_size, nb_gru_units)
         Set initial hidden and cell states
         ¿INICIO CON ZEROS O CON RANDN? VI LOS DOS CASOS."""
-        h0 = torch.zeros(self.num_layers*2, self.batch_size, self.hidden_size) # 2 for bidirection
-        h0 = torch.autograd.Variable(h0.type(dtype=dtype_data), requires_grad=True).to(device)
+        h0 = torch.autograd.Variable(next(self.parameters()).data.new(self.num_layers*2, self.batch_size,  self.hidden_size), requires_grad=False)
 
-        return (h0)
+        return h0.zero_()
 
 
     def forward(self, x, x_lengths):
@@ -194,6 +197,8 @@ def ce_loss(y_hat, y):
     # compute cross entropy loss which ignores all <PAD> tokens
     ce_loss = -torch.sum(y_hat) / nb_tokens
 
+    # del variables
+    del y_hat, y, tag_pad_token, nb_tokens, mask
 
     return ce_loss
 
@@ -202,14 +207,14 @@ def statistics(y_hat, y, y_lengths):
 
     _, preds = torch.max(y_hat, 2)
 
-    accuracy1 = 0.0
+    # accuracy1 = 0.0
     accuracy = 0.0
     sensibility = 0.0
     specificity = 0.0
     precision = 0.0
     npv = 0.0
     for i in range(y.size()[0]):
-        accuracy1 += torch.sum(preds[i, 0:y_lengths[i]] == y.data[i, 0:y_lengths[i]]).float() / y_lengths[i]
+        #accuracy1 += torch.sum(preds[i, 0:y_lengths[i]] == y.data[i, 0:y_lengths[i]]).float() / y_lengths[i]
 
         #confusion matrix: 1 and 1 (TP); 1 and 0 (FP); 0 and 0 (TN); 0 and 1 (FN)
         aux = preds[i, 0:y_lengths[i]].float() / y.data[i, 0:y_lengths[i]].float()
@@ -237,5 +242,7 @@ def statistics(y_hat, y, y_lengths):
     specificity = specificity / len(y_lengths)
     precision = precision / len(y_lengths)
     npv = npv / len(y_lengths)
+
+    del tp, fp, tn, fn, aux, y_hat, y, y_lengths
 
     return accuracy, sensibility, specificity, precision, npv
