@@ -27,10 +27,10 @@ from torch.optim import lr_scheduler
 import torchvision.transforms as T
 from torch.utils.data import DataLoader
 
-from model import model_gru, model_lstm
+from sleep_rnn.Model import model_gru, model_lstm
 
-from SHHS_Dataset import SHHS_Dataset, collate_fn_RC, ToTensor
-from train_model import train_model
+from sleep_rnn.SHHS_Dataset import SHHS_Dataset, collate_fn_RC, ToTensor
+from sleep_rnn.Train_Model import train_model
 
 # from matplotlib import pyplot as plt
 
