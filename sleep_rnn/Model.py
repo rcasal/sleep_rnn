@@ -7,6 +7,8 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import numpy as np
 
 
 class ModelLstm(nn.Module):
@@ -196,7 +198,6 @@ def statistics(y_hat, y, y_lengths):
 
     _, preds = torch.max(y_hat, 2)
 
-    # accuracy1 = 0.0
     accuracy = 0.0
     sensibility = 0.0
     specificity = 0.0
@@ -237,3 +238,79 @@ def statistics(y_hat, y, y_lengths):
     del y_hat, y, y_lengths
 
     return accuracy, sensibility, specificity, precision, npv
+
+
+def statistics_test(y_hat, y, y_lengths):
+
+    _, preds = torch.max(y_hat, 2)
+
+    stats = {}
+    stats['acc'] = [0.0, 0.0]
+    stats['se'] = [0.0, 0.0]
+    stats['sp'] = [0.0, 0.0]
+    stats['pre'] = [0.0, 0.0]
+    stats['npv'] = [0.0, 0.0]
+    stats['kappa'] = [0.0, 0.0]
+    stats['err'] = [0.0, 0.0]
+    stats['rel_err'] = [0.0, 0.0]
+
+    for j in range(2):
+        for i in range(y.size()[0]):
+
+            y_i = y[i, 0:y_lengths[i]]
+            preds_i = preds[i, 0:y_lengths[i]]
+            if j is 1:
+                y_i, _ = torch.median(y_i.view(-1, 30), dim=1)
+                preds_i, _ = torch.median(preds_i.view(-1, 30), dim=1)
+                # preds[preds == 0.5] = 1  # Si empatan les asigno dormido (podría asignarle el valor ant)
+
+            # confusion matrix: 1 and 1 (TP); 1 and 0 (FP); 0 and 0 (TN); 0 and 1 (FN)
+            aux = preds_i.float() / y_i.data.float()
+
+            tp = torch.sum(aux == 1.0).item() + 1e-8
+            fp = torch.sum(aux == float('inf')).item() + 1e-8
+            tn = torch.sum(torch.isnan(aux)).item() + 1e-8
+            fn = torch.sum(aux == 0).item() + 1e-8
+
+            stats['acc'][j] += (tp + tn) / (tp + tn + fp + fn)
+            stats['se'][j] += tp / (tp + fn)
+            stats['sp'][j] += tn / (tn + fp)
+            stats['pre'][j] += tp / (tp + fp)
+            stats['npv'][j] += tn / (tn + fn)
+            a_rnd = ((tp + fp)*(tp + fn) + (fp + tn)*(fn + tn))/(tp + tn + fp + fn)**2
+            stats['kappa'][j] += (stats['acc'][j] - a_rnd)/(1 - a_rnd)
+
+            if j is 0:
+                tst = torch.sum(y_i == 1).item() / (60 * 60)
+                tst_est = torch.sum(preds_i == 1).item() / (60 * 60)
+            else:
+                tst = torch.sum(y_i == 1).item() / (2 * 60)
+                tst_est = torch.sum(preds_i == 1).item() / (2 * 60)
+
+            stats['err'][j] += abs(tst-tst_est)
+            stats['rel_err'][j] += abs(tst-tst_est)/tst
+
+
+            # Plots
+            # t = np.arange(0, y_lengths[i], 1) / (60 * 60)
+            # t_vote = np.arange(0, y_lengths[i], 30) / (60 * 60)
+            #
+            # plt.figure()
+            # plt.subplot(2, 1, 1)
+            # plt.plot(t, y[i, 0:y_lengths[i]].numpy(), 'k', t, preds[i, 0:y_lengths[i]].numpy(), 'r--')
+            # plt.subplot(2, 1, 2)
+            # plt.plot(t_vote, y_vote, 'k', t_vote, preds_vote, 'r--')
+            # plt.xlabel('Tiempo en horas')
+            # plt.show()
+
+        stats['acc'][j] = stats['acc'][j] / len(y_lengths)
+        stats['se'][j] = stats['se'][j] / len(y_lengths)
+        stats['sp'][j] = stats['sp'][j] / len(y_lengths)
+        stats['pre'][j] = stats['pre'][j] / len(y_lengths)
+        stats['npv'][j] = stats['npv'][j] / len(y_lengths)
+        stats['kappa'][j] = stats['kappa'][j] / len(y_lengths)
+        stats['err'][j] = stats['err'][j] / len(y_lengths)
+        stats['rel_err'][j] = stats['rel_err'][j] / len(y_lengths)
+
+
+    return stats
