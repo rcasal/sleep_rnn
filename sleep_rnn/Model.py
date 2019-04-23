@@ -121,7 +121,7 @@ class ModelGru(nn.Module):
 
         return h0.zero_()
 
-    def forward(self, x, x_lengths):
+    def forward(self, x, x_lengths=None):
         """ reset the GRU hidden state. Must be done before you run a new patient. Otherwise the GRU will treat
         # a new batch as a continuation of a sequence """
 
@@ -133,13 +133,15 @@ class ModelGru(nn.Module):
         # Dim transformation: (batch_size, seq_len, d_in) -> (batch_size, seq_len, hidden_size)
 
         # pack_padded_sequence so that padded items in the sequence won't be shown to the GRU
-        x = nn.utils.rnn.pack_padded_sequence(x, x_lengths, batch_first=True)
+        if x_lengths is not None:
+            x = nn.utils.rnn.pack_padded_sequence(x, x_lengths, batch_first=True)
 
         # now run through GRU
         x, self.hidden = self.gru(x, self.hidden)
 
         # undo the packing operation
-        x, _ = nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
+        if x_lengths is not None:
+            x, _ = nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
 
         # 2. Project to target space
         # Dim transformation: (batch_size, seq_len, hidden_size) -> (batch_size * seq_len, hidden_size)
@@ -253,6 +255,9 @@ def statistics_test(y_hat, y, y_lengths):
     stats['kappa'] = [0.0, 0.0]
     stats['err'] = [0.0, 0.0]
     stats['rel_err'] = [0.0, 0.0]
+    stats['tst'] = [0.0, 0.0]
+    stats['tst_est'] = [0.0, 0.0]
+    stats['trt'] = [0.0, 0.0]
 
     for j in range(2):
         for i in range(y.size()[0]):
@@ -283,25 +288,38 @@ def statistics_test(y_hat, y, y_lengths):
             if j is 0:
                 tst = torch.sum(y_i == 1).item() / (60 * 60)
                 tst_est = torch.sum(preds_i == 1).item() / (60 * 60)
+                trt = len(y_i)  / (60 * 60)
             else:
                 tst = torch.sum(y_i == 1).item() / (2 * 60)
                 tst_est = torch.sum(preds_i == 1).item() / (2 * 60)
+                trt = len(y_i)/ (2 * 60)
 
             stats['err'][j] += abs(tst-tst_est)
             stats['rel_err'][j] += abs(tst-tst_est)/tst
-
+            stats['tst'][j] += tst
+            stats['tst_est'][j] += tst_est
+            stats['trt'][j] += trt
 
             # Plots
-            # t = np.arange(0, y_lengths[i], 1) / (60 * 60)
-            # t_vote = np.arange(0, y_lengths[i], 30) / (60 * 60)
+            # if j is 0:
+            #     plt.figure()
+            #     t = np.arange(0, y_lengths[i], 1) / (60 * 60)
+            # else:
+            #     t = np.arange(0, y_lengths[i], 30) / (60 * 60)
             #
-            # plt.figure()
-            # plt.subplot(2, 1, 1)
-            # plt.plot(t, y[i, 0:y_lengths[i]].numpy(), 'k', t, preds[i, 0:y_lengths[i]].numpy(), 'r--')
-            # plt.subplot(2, 1, 2)
-            # plt.plot(t_vote, y_vote, 'k', t_vote, preds_vote, 'r--')
-            # plt.xlabel('Tiempo en horas')
+            # plt.subplot(2, 1, j+1)
+            # plt.plot(t, y_i.numpy(), 'k', t, preds_i.numpy(), 'r--')
+            # plt.xlabel('Time [hs]')
+            # plt.title(stats['err'][j]*60)
+
+            # Plots para franceses:
+            # f = plt.figure()
+            # plt.plot(t, y_i.numpy(), 'k', t, preds_i.numpy(), 'r--')
+            # plt.xlabel('Time [hs]')
+            # plt.yticks(np.arange(2), ('W', 'S'))
             # plt.show()
+            # # f.savefig("Subj1.pdf", bbox_inches='tight')
+
 
         stats['acc'][j] = stats['acc'][j] / len(y_lengths)
         stats['se'][j] = stats['se'][j] / len(y_lengths)
@@ -311,6 +329,9 @@ def statistics_test(y_hat, y, y_lengths):
         stats['kappa'][j] = stats['kappa'][j] / len(y_lengths)
         stats['err'][j] = stats['err'][j] / len(y_lengths)
         stats['rel_err'][j] = stats['rel_err'][j] / len(y_lengths)
+        stats['tst'][j] = stats['tst'][j]/ len(y_lengths)
+        stats['tst_est'][j] = stats['tst_est'][j]/ len(y_lengths)
+        stats['trt'][j] = stats['trt'][j]/ len(y_lengths)
 
-
+    # plt.show()
     return stats

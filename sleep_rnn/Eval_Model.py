@@ -1,10 +1,13 @@
 
+import os
 import torch
 import time
 from sleep_rnn.Model import ce_loss, statistics_test
+from scipy.io import savemat
+import numpy as np
 
 
-def eval_model(model, dataloaders, cuda=None, dtype_data=None, dtype_target=None):
+def eval_model(model, dataloaders, path_save=None, model_name=None, cuda=None, dtype_data=None, dtype_target=None):
 
     # init
 
@@ -16,6 +19,15 @@ def eval_model(model, dataloaders, cuda=None, dtype_data=None, dtype_target=None
 
     if dtype_target is None:
         dtype_target = torch.int64
+
+    if path_save is None:
+        save = False
+    else:
+        save = True
+        if model_name is None:
+            model_name = "default_name"
+
+
 
     since = time.time()
 
@@ -38,6 +50,8 @@ def eval_model(model, dataloaders, cuda=None, dtype_data=None, dtype_target=None
         running_err = [0.0, 0.0]
         running_rel_err = [0.0, 0.0]
 
+        list_specs ={'patient': [], 'acc': [],'se': [], 'sp': [], 'pre': [], 'npv': [], 'kappa': [],
+                     'err': [], 'rel_err': [], 'tst': [], 'tst_est': [], 'trt': []}
 
         # Iterate over data.
         for i_batch, sample in enumerate(dataloaders[phase]):
@@ -56,6 +70,21 @@ def eval_model(model, dataloaders, cuda=None, dtype_data=None, dtype_target=None
             # del sample
             lb = sample['feat'].size(0)
             del sample, outputs
+
+            #statistics to save
+            if save is True:
+                list_specs['patient'].append(i_batch)
+                list_specs['acc'].append(specs['acc'])
+                list_specs['se'].append(specs['se'])
+                list_specs['sp'].append(specs['sp'])
+                list_specs['pre'].append(specs['pre'])
+                list_specs['npv'].append(specs['npv'])
+                list_specs['kappa'].append(specs['kappa'])
+                list_specs['err'].append(specs['err'])
+                list_specs['rel_err'].append(specs['rel_err'])
+                list_specs['tst'].append(specs['tst'])
+                list_specs['tst_est'].append(specs['tst_est'])
+                list_specs['trt'].append(specs['trt'])
 
             # statistics
             running_loss += loss.item() * lb
@@ -100,6 +129,12 @@ def eval_model(model, dataloaders, cuda=None, dtype_data=None, dtype_target=None
               .format(' - ', 'Si', ' - ', epoch_acc[1], epoch_se[1], epoch_sp[1], epoch_pre[1], epoch_npv[1],
                       epoch_kappa[1], epoch_err[1], epoch_rel_err[1]))
 
+        if save is True:
+            savemat(os.path.join(path_save, 'stats_' + phase + '_' +  model_name ), list_specs)
+
+
     time_elapsed = time.time() - since
     print('Testing complete in {:.0f}m {:.0f}s'.format(
         time_elapsed // 60, time_elapsed % 60))
+
+

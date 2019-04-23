@@ -14,13 +14,14 @@ import os
 
 class ShhsDataset(Dataset):
 
-    def __init__(self, dbpath, transform=None, loadSaO2=True):
+    def __init__(self, dbpath, transform=None, loadSaO2=True, loadDB5=False):
         self.dbpath = dbpath
         self.listdir = os.listdir(self.dbpath)
         self.listdir.sort()
         self.listdir = self.listdir[1:]         # Discard sample 1: sequenceLengths.mat
         self.transform = transform
         self.loadSaO2 = loadSaO2
+        self.loadDB5 = loadDB5
         self.lengths = loadmat(os.path.join(self.dbpath, 'sequenceLengths.mat'))
         self.lengths = self.lengths['sequenceLengths'].squeeze()
 
@@ -34,8 +35,11 @@ class ShhsDataset(Dataset):
         else:
             feats = subj['HR'].reshape(-1, 1)
 
-        target = subj['target2'].flatten()
-
+        if self.loadDB5:
+            target = subj['target5'].flatten()
+        else:
+            target = subj['target2'].flatten()
+	
         sample = {'feat': feats, 'target': target}
 
         if self.transform:

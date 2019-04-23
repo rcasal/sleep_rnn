@@ -41,7 +41,7 @@ def train_model(model, optimizer, dataloaders, scheduler=None, num_epochs=25, cu
     if checkpoint is True:
         cp = torch.load(os.path.join(path_bkp, 'bkp_model_ft.pth'))
         epoch_run = cp['epoch']
-        model.load_state_dict(cp['model_state_dict'])
+        model.load_state_dict(cp['model_state_dict'])          # Load state of the last epoch
         best_model_wts = cp['best_model_wts']
         optimizer.load_state_dict(cp['optimizer_state_dict'])
         best_acc = cp['best_acc']
