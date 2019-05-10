@@ -9,7 +9,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import matplotlib.pyplot as plt
 import numpy as np
-
+from sklearn.metrics import confusion_matrix, cohen_kappa_score
 
 class ModelLstm(nn.Module):
     def __init__(self, d_in, hidden_size, num_layers, batch_size, d_out):
@@ -223,11 +223,15 @@ def statistics(y_hat, y, y_lengths):
         tn = torch.sum(torch.isnan(aux)).item() + 1e-8
         fn = torch.sum(aux == 0).item() + 1e-8
 
-        accuracy += (tp + tn) / (tp + tn + fp + fn)
+        # accuracy += (tp + tn) / (tp + tn + fp + fn)
         sensibility += tp / (tp + fn)
         specificity += tn / (tn + fp)
         precision += tp / (tp + fp)
         npv += tn / (tn + fn)
+
+        # Otra forma de calcular accuracy util para multiclass
+        coinc = (preds[i, 0:y_lengths[i]].float() == y.data[i, 0:y_lengths[i]].float()).sum()
+        accuracy += coinc.item() / preds[i, 0:y_lengths[i]].__len__()
 
         del tp, fp, tn, fn, aux
 
@@ -240,6 +244,7 @@ def statistics(y_hat, y, y_lengths):
     del y_hat, y, y_lengths
 
     return accuracy, sensibility, specificity, precision, npv
+
 
 
 def statistics_test(y_hat, y, y_lengths):
@@ -334,4 +339,49 @@ def statistics_test(y_hat, y, y_lengths):
         stats['trt'][j] = stats['trt'][j]/ len(y_lengths)
 
     # plt.show()
+    return stats
+
+
+
+def statistics_test_multiclass(y_hat, y, y_lengths, n_class):
+    "Sólo funciona para n_batch 1!!!"
+
+    if len(y_lengths) is 1:
+
+        _, preds = torch.max(y_hat, 2)
+
+        stats = {}
+        stats['acc'] = 0.0
+        stats['kappa'] = 0.0
+        stats['confusion_matrix'] = np.zeros([n_class,n_class])
+        stats['confusion_matrix_percentage'] = np.zeros([n_class,n_class])
+
+        y_i = y[0, 0:y_lengths[0]]
+        preds_i = preds[0, 0:y_lengths[0]]
+
+        y_i, _ = torch.median(y_i.view(-1, 30), dim=1)
+        preds_i, _ = torch.median(preds_i.view(-1, 30), dim=1)
+
+        coinc = (preds_i.float() == y_i.data.float()).sum()
+        stats['acc'] = coinc.item()/preds_i.__len__()
+
+        stats['confusion_matrix'] = confusion_matrix(preds_i, y_i, [0, 1, 2, 3, 4, 5])
+
+        # stats['confusion_matrix_percentage'] = stats['confusion_matrix'] / stats['confusion_matrix'].astype(np.float).sum(axis=0)
+
+        stats['kappa']  = cohen_kappa_score(preds_i, y_i, [0, 1, 2, 3, 4, 5])
+
+        # print(stats['confusion_matrix'])
+        # # plots
+        # plt.subplot(2,1,1)
+        # plt.plot(y_i.numpy(), 'k')
+        # tit = 'Acc:' + str(stats['acc'])
+        # plt.title(tit)
+        # plt.subplot(2,1,2)
+        # plt.plot(preds_i.numpy(), 'k')
+        # plt.xlabel('Time [hs]')
+        # plt.show()
+    else:
+        print('Error. Minibatch size must be 1!')
+        exit()
     return stats
