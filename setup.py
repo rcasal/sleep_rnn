@@ -6,14 +6,14 @@ def readme():
         return f.read()
 
 
-setup(name='sleep_rnn',
+setup(name='sleep_transformer',
       version='0.1',
-      description='RNN para determinar estado de sueño',
-      url='https://github.com/rcasal/sleep_rnn.git',
+      description='sleep transformer para determinar estado de sueño con entrenamiento en dos etapas',
+      url='https://github.com/rcasal/sleep_transformer.git',
       author='Ramiro Casal',
       author_email='rcasal@conicet.gov.ar',
       license='MIT',
-      packages=['sleep_rnn'],
+      packages=['sleep_transformer'],
       entry_points={},
       install_requires=[
           'numpy',
